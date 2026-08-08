@@ -20,7 +20,7 @@ begin
 
       Mode => Ada.Text_IO.Out_File,
 
-      Name => "memories/memory.txt");
+      Name => "memories/000001.txt");
 
    Ada.Text_IO.Put_Line
 
@@ -30,7 +30,7 @@ begin
 
    Ada.Text_IO.Close (Memory_File);
 
-   Ada.Text_IO.Put_Line ("Memory saved.");
+   Ada.Text_IO.Put_Line ("Memory 000001 saved.");
 
 end Elephant;
 
