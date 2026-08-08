@@ -34,6 +34,234 @@ It will be able to:
 
 That is enough for the first working Elephant.
 
+## Implementation Languages
+
+Elephant deliberately separates its core from the tools and services it conducts.
+
+The initial architecture uses three programming languages for distinct purposes:
+
+- **Ada** for the Elephant Core
+
+- **Python** for rapidly developing Elephant Keys and taking advantage of its large software ecosystem
+
+- **Rust** for Keys or other components that require greater performance, security, or rigor
+
+These are implementation choices, not restrictions on the architecture.
+
+Elephant should remain capable of incorporating components written in other languages when useful.
+
+### Ada: The Core
+
+The Elephant Core will be implemented in Ada.
+
+Ada was chosen because the core should emphasize:
+
+- readability
+
+- explicit structure
+
+- strong typing
+
+- reliability
+
+- maintainability
+
+- long-term durability
+
+- understandable interfaces
+
+The core contains the behavior that defines Elephant itself.
+
+It should remain relatively small and should not accumulate dependencies merely because an external service requires them.
+
+The Elephant Core should not need to understand the implementation details of every system it conducts.
+
+Instead, external capabilities are reached through Keys.
+
+### Python: Ecosystem Keys
+
+Python is particularly valuable because of its enormous ecosystem.
+
+Many AI systems, APIs, scientific packages, databases, automation systems, and other services already provide mature Python libraries.
+
+Elephant can take advantage of that ecosystem without making Python a permanent dependency of the core.
+
+A Python Key can translate between an external system and the Elephant Key Protocol.
+
+Python is therefore a preferred language for:
+
+- rapidly developing new Keys
+
+- experimenting with integrations
+
+- using existing Python libraries
+
+- prototyping new Elephant capabilities
+
+- connecting to services whose best-supported interface is Python
+
+A Python Key can be replaced without replacing Elephant.
+
+### Rust: Hardened Keys
+
+Some Keys may eventually require characteristics beyond those needed during initial development.
+
+A Key may become:
+
+- performance-critical
+
+- security-critical
+
+- resource-intensive
+
+- widely deployed
+
+- difficult to distribute reliably with its Python dependencies
+
+Such a Key may be reimplemented in Rust.
+
+Rust provides strong memory-safety guarantees while retaining the performance and deployment characteristics of compiled systems software.
+
+A typical development path may therefore be:
+
+    Python prototype
+
+          |
+
+          v
+
+    Working Elephant Key
+
+          |
+
+          v
+
+    Proven requirement
+
+          |
+
+          v
+
+    Rust implementation when justified
+
+Rewriting a Python Key in Rust should not require changing the Elephant Core.
+
+Both implementations should present the same interface to Elephant.
+
+## Elephant Keys
+
+An Elephant Key is a connector between Elephant and another system.
+
+The name reflects its purpose:
+
+**A Key allows Elephant to unlock and use a capability that exists outside Elephant itself.**
+
+Possible Keys might connect Elephant to:
+
+- an AI provider
+
+- a local AI model
+
+- Git
+
+- GitHub
+
+- Google services
+
+- email
+
+- calendars
+
+- search engines
+
+- databases
+
+- cloud storage
+
+- scientific software
+
+- operating-system services
+
+- command-line programs
+
+- other applications
+
+A Key should do one job well.
+
+Elephant should not incorporate an external system's implementation details into its core merely to communicate with that system.
+
+Instead:
+
+    Elephant Core
+
+          |
+
+          v
+
+    Elephant Key Protocol
+
+          |
+
+          v
+
+    Key
+
+          |
+
+          v
+
+    External System
+
+The external system can change without requiring the Elephant Core to change.
+
+The Key can change without requiring the external system or Elephant Core to change.
+
+## The Elephant Key Protocol
+
+All Keys should communicate with Elephant through a stable, documented interface.
+
+This interface is the **Elephant Key Protocol**.
+
+The protocol should describe what information passes between Elephant and a Key without requiring either side to know how the other is implemented.
+
+For example:
+
+    Elephant Core
+
+          |
+
+          +--> Python Key --> AI service
+
+          |
+
+          +--> Python Key --> Google Calendar
+
+          |
+
+          +--> Rust Key ----> high-performance service
+
+          |
+
+          +--> Ada Key -----> local capability
+
+          |
+
+          +--> other Key ---> future system
+
+The protocol should be language-independent.
+
+A Key should not need to be written in Ada, Python, or Rust.
+
+Any implementation that correctly speaks the Elephant Key Protocol should be capable of becoming an Elephant Key.
+
+This gives Elephant an important property:
+
+**The implementation language of a component is replaceable.**
+
+The first version of the Key Protocol should remain extremely small.
+
+It should grow only when working Keys demonstrate the need for additional capabilities.
+
 ## Repository Layout
 
 The initial repository can remain very small.
@@ -60,13 +288,11 @@ The initial repository can remain very small.
 
     |
 
-    +-- elephant/
+    +-- src/
 
-    |     +-- __init__.py
+    |     +-- elephant.adb
 
-    |     +-- cli.py
-
-    |     +-- memory.py
+    |     +-- elephant.ads
 
     |
 
@@ -76,11 +302,23 @@ The initial repository can remain very small.
 
     +-- tests/
 
+Directories for Keys can be introduced when the first Key is actually needed.
+
+For example:
+
+    keys/
+
+        python/
+
+        rust/
+
 The exact structure may change as we learn from the implementation.
 
 The important distinction is between:
 
-- program code
+- Elephant Core
+
+- Elephant Keys
 
 - durable memories
 
@@ -352,7 +590,7 @@ For example:
 
     Elephant could not find memory 20260808-017.
 
-A Python traceback should not be the normal user experience.
+An Ada exception traceback or other internal diagnostic should not be the normal user experience.
 
 ## Tests
 
@@ -408,9 +646,13 @@ Version 0.1 will not include:
 
 - a graphical interface
 
+- a large collection of Keys
+
 Those capabilities may become useful later.
 
 Building them now would obscure the experiment.
+
+The Key architecture can be defined before Elephant actually needs its first external Key.
 
 ## The First Demonstration
 
