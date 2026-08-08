@@ -2,6 +2,8 @@ with Ada.Text_IO;
 
 procedure Elephant is
 
+   Memory_ID   : constant String := "000001";
+
    Memory      : String (1 .. 1000);
 
    Last        : Natural;
@@ -20,7 +22,7 @@ begin
 
       Mode => Ada.Text_IO.Out_File,
 
-      Name => "memories/000001.txt");
+      Name => "memories/" & Memory_ID & ".txt");
 
    Ada.Text_IO.Put_Line
 
@@ -30,7 +32,7 @@ begin
 
    Ada.Text_IO.Close (Memory_File);
 
-   Ada.Text_IO.Put_Line ("Memory 000001 saved.");
+   Ada.Text_IO.Put_Line ("Memory " & Memory_ID & " saved.");
 
 end Elephant;
 
