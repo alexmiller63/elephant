@@ -16,6 +16,12 @@ package Elephant_Memory.SQLite is
      (Target : in out SQLite_Store; Event : Memory_Event);
    overriding function Read_Event
      (Target : SQLite_Store; ID, Requester : Text) return Memory_Event;
+   overriding function List_Events
+     (Target : SQLite_Store; Requester : Text; Include_History : Boolean := False;
+      Limit : Page_Size := 50; Offset : Natural := 0) return Event_Page;
+   overriding function Search_Events
+     (Target : SQLite_Store; Requester, Query : Text; Include_History : Boolean := False;
+      Limit : Page_Size := 50; Offset : Natural := 0) return Event_Page;
    overriding procedure Erase_Owner
      (Target : in out SQLite_Store; Owner_ID, Requester : Text);
 

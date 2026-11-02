@@ -321,6 +321,18 @@ package body Elephant_Memory.SQLite is
       end if;
    end Append;
 
+   function Event_From_Row (Stmt : Statement) return Memory_Event is
+   begin
+      return (ID => Column (Stmt, 0), Record_Kind => Column (Stmt, 1),
+              Content => Column (Stmt, 2),
+              Source => Source_Kind'Value (To_String (Column (Stmt, 3))),
+              Source_Ref => Column (Stmt, 4), Recorded_UTC => Column (Stmt, 5),
+              Evidence => Evidence_Status'Value (To_String (Column (Stmt, 6))),
+              Owner_ID => Column (Stmt, 7), Supersedes_ID => Column (Stmt, 8));
+   exception
+      when Constraint_Error => raise Storage_Error with "invalid stored event representation";
+   end Event_From_Row;
+
    overriding function Read_Event
      (Target : SQLite_Store; ID, Requester : Text) return Memory_Event
    is
@@ -344,15 +356,81 @@ package body Elephant_Memory.SQLite is
       elsif Status /= Row then
          Check (DB, Status);
       end if;
-      return (ID => Column (Stmt, 0), Record_Kind => Column (Stmt, 1),
-              Content => Column (Stmt, 2),
-              Source => Source_Kind'Value (To_String (Column (Stmt, 3))),
-              Source_Ref => Column (Stmt, 4), Recorded_UTC => Column (Stmt, 5),
-              Evidence => Evidence_Status'Value (To_String (Column (Stmt, 6))),
-              Owner_ID => Column (Stmt, 7), Supersedes_ID => Column (Stmt, 8));
-   exception
-      when Constraint_Error => raise Storage_Error with "invalid stored event representation";
+      return Event_From_Row (Stmt);
    end Read_Event;
+
+   function Retrieve
+     (Target : SQLite_Store; Requester, Query : Text;
+      Search, Include_History : Boolean; Limit : Page_Size; Offset : Natural)
+      return Event_Page
+   is
+      Stmt : Statement;
+      DB : constant System.Address := Target.Database.Handle;
+      Page : Event_Page;
+      Status : C.int;
+      Query_String : constant String := To_String (Query);
+   begin
+      Require_Open (Target);
+      if Requester /= Target.Owner then
+         raise Access_Denied with "requester differs from connection owner";
+      end if;
+      if Search and then
+        (Query_String'Length > Maximum_Query_Bytes
+         or else (for all Ch of Query_String =>
+                    Ch in ' ' | ASCII.HT | ASCII.LF | ASCII.CR | ASCII.FF | ASCII.VT)
+         or else (for some Ch of Query_String => Ch = Character'Val (0)))
+      then
+         raise Invalid_Query with "search must be nonblank, NUL-free, and at most 4096 bytes";
+      end if;
+      Prepare (DB,
+        "WITH owned AS (SELECT e.id,e.record_kind,e.content,e.source_kind," &
+        "e.source_ref,e.recorded_utc,e.evidence_status,e.owner_id,e.supersedes_id," &
+        "NOT EXISTS (SELECT 1 FROM memory_event AS child " &
+        "WHERE child.supersedes_id=e.id AND child.owner_id=e.owner_id) AS is_current " &
+        "FROM memory_event AS e WHERE e.owner_id=?) " &
+        "SELECT * FROM owned WHERE (?='1' OR is_current) " &
+        "AND (?='0' OR instr(lower(content),lower(?))>0) " &
+        "ORDER BY recorded_utc DESC,id COLLATE BINARY ASC LIMIT ? OFFSET ?", Stmt);
+      Bind (DB, Stmt, 1, To_String (Requester));
+      Bind (DB, Stmt, 2, (if Include_History then "1" else "0"));
+      Bind (DB, Stmt, 3, (if Search then "1" else "0"));
+      Bind (DB, Stmt, 4, Query_String);
+      --  Read one extra row to distinguish a full last page from more results.
+      Bind (DB, Stmt, 5, Natural'Image (Natural (Limit) + 1));
+      Bind (DB, Stmt, 6, Natural'Image (Offset));
+      loop
+         Status := Step (Stmt.Handle);
+         exit when Status = Done;
+         if Status /= Row then
+            Check (DB, Status);
+         end if;
+         if Natural (Page.Items.Length) = Natural (Limit) then
+            Page.Has_More := True;
+            exit;
+         end if;
+         Page.Items.Append
+           (Memory_Hit'(Item => Event_From_Row (Stmt),
+                        Is_Current => To_String (Column (Stmt, 9)) = "1"));
+      end loop;
+      return Page;
+   end Retrieve;
+
+   overriding function List_Events
+     (Target : SQLite_Store; Requester : Text; Include_History : Boolean := False;
+      Limit : Page_Size := 50; Offset : Natural := 0) return Event_Page
+   is
+   begin
+      return Retrieve (Target, Requester, Null_Unbounded_String,
+                       False, Include_History, Limit, Offset);
+   end List_Events;
+
+   overriding function Search_Events
+     (Target : SQLite_Store; Requester, Query : Text; Include_History : Boolean := False;
+      Limit : Page_Size := 50; Offset : Natural := 0) return Event_Page
+   is
+   begin
+      return Retrieve (Target, Requester, Query, True, Include_History, Limit, Offset);
+   end Search_Events;
 
    overriding procedure Erase_Owner
      (Target : in out SQLite_Store; Owner_ID, Requester : Text)
