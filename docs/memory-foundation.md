@@ -1,7 +1,8 @@
 # Memory foundation — Ada SQLite adapter
 
 Status: local implementation, compiled and tested with GNAT 13.3 on Linux.
-Thirteen test cases pass: seven schema checks and six Ada integration scenarios.
+Twenty-five test cases pass: seven schema checks, six Ada storage integration
+scenarios, and twelve retrieval scenarios.
 
 This implements Ada memory interfaces, an initial SQLite schema, and a working
 SQLite adapter. It does not yet implement model selection, an AI
@@ -17,6 +18,8 @@ by this slice. The existing demonstration program remains separate.
 - `tests/memory_adapter_check.adb`: exercises the public Ada interface.
 - `tests/test_memory_adapter.py`: compiles Ada with assertions and warnings treated
   as errors, then checks persisted data independently through Python's SQLite API.
+- `tests/memory_retrieval_check.adb` and `tests/test_memory_retrieval.py`: compile
+  and exercise listing/search through Ada, using independently seeded fixtures.
 
 Run from the repository root:
 
@@ -54,6 +57,38 @@ raise `Elephant_Memory.Storage_Error` without partially saving an event.
 Catch `Elephant_Memory.Storage_Error` by its qualified name to distinguish it
 from Ada's predefined `Standard.Storage_Error`. Invalid events, denied access,
 and absent records have separate exceptions in `Elephant_Memory`.
+
+## Listing and search
+
+`List_Events (Target, Requester)` retrieves current records without knowing IDs.
+`Search_Events (Target, Requester, Query)` searches only their content for a literal
+substring. Both enforce the connection owner and return an `Event_Page` with
+`Items` and `Has_More`. Each `Memory_Hit` contains the full event in `Item` and
+an `Is_Current` flag. Source references, source kind, and evidence status remain
+exactly as recorded; retrieval does not verify or rewrite them.
+
+By default, only records with no correcting child are included. Set
+`Include_History => True` to include superseded records. `Is_Current = False`
+labels superseded history; a nonempty `Item.Supersedes_ID` identifies a correction
+and links to its predecessor. Both leaves of a branching correction are returned
+without declaring a winner. An original with no corrections is also current.
+
+Results are ordered by `Recorded_UTC` descending, then ID in binary ascending
+order to break timestamp ties. Pages default to 50 records; `Page_Size` restricts
+`Limit` to 1–100. `Offset` skips matching records. `Has_More` is based on one extra
+matching row rather than an expensive total count. A page is one SQLite statement
+snapshot. Offset pagination across several calls can shift if writes occur
+between calls; it does not promise a consistent multi-page snapshot.
+
+Search folds ASCII case only. Non-ASCII bytes match exactly: `café` matches itself,
+but `CAFÉ` does not match `café`. `%`, `_`, quotes, and SQL-looking text are literal
+characters, not query syntax. Empty or ASCII-whitespace-only searches, embedded
+NUL, and queries over 4,096 bytes raise `Invalid_Query`; leading/trailing spaces
+in a nonblank query are retained. No matches return an empty page, not `Not_Found`.
+
+This is a bounded literal-search API, not semantic recall or a conversation UI.
+It uses the existing version-one schema and owner index; content matching scans
+the owner's records. No search index, ranking model, or schema migration is added.
 
 ## Contract
 
@@ -104,10 +139,16 @@ rollback after an injected mid-erasure failure, competing writers, unknown/futur
 schemas, and failed initialization. Existing schema tests also verify branching
 corrections and protection against updates and INSERT OR REPLACE.
 
+Retrieval tests cover owner isolation, historical-match suppression, explicit
+history and correction labels, branching corrections, preserved provenance,
+ASCII/Unicode matching, literal wildcards/quotes, SQL injection attempts,
+content-only matching, tied timestamps, page/query boundaries, missing records,
+closed connections, invalid queries, and read-only behavior.
+
 The adapter uses SQLite's documented C interface, including parameter binding
 with copied text and statement/connection cleanup:
 https://sqlite.org/c3ref/bind_blob.html and https://sqlite.org/c3ref/close.html.
 
-Not yet implemented: user login, memory search/listing, ID generation, backup
+Not yet implemented: user login, semantic recall, ID generation, backup
 management, provider adapters, model selection, background scheduling, or a new
 interactive application. The earlier text-file demonstration remains separate.
