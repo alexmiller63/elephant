@@ -1,0 +1,27 @@
+name: Ada and SQLite tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  memory-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out Elephant
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install Ada compiler and SQLite
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gnat python3 libsqlite3-0
+      - name: Show compiler version
+        run: gnatmake --version
+      - name: Compile Ada and run memory tests
+        run: python3 -B -m unittest discover -s tests -v
